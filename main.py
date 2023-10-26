@@ -47,17 +47,19 @@ def read(query):
 
 
 def create(file):
-    if search(file):
+    location = search(file)
+    print(location)
+    if location:
         print(file + " already exists.")
         return 0
     else:
         ip = socket.gethostbyname(socket.gethostname()+".")
-        os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " mkdir /home/cmsc626/Desktop/files/" + file ).read()
-        os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + file + "/" + ip).read()
+        os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " mkdir /home/cmsc626/Desktop/files/" + location[1]).read()
+        os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/" + ip).read()
         # Combine everything cause race conditions
-        os.popen("mkdir " + "files/" + file + " && " + "touch " + "files/" + file + "/" + file + " && " + "touch " + "files/" + file + "/" + ".version" + " && "
-                + "echo \'1\n" + ip + "\' > " + "files/" + file + "/" + ".version" + " && "
-                + "sshpass -p 12345 rsync files/" + file + "/" + ".version" + " cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + file + "/.version")
+        os.popen("mkdir " + "files/" + location[1] + " && " + "touch " + "files/" + location[1] + "/" + location[1] + " && " + "touch " + "files/" + location[1] + "/" + ".version" + " && "
+                + "echo \'1\n" + ip + "\' > " + "files/" + location[1] + "/" + ".version" + " && "
+                + "sshpass -p 12345 rsync files/" + location[1] + "/" + ".version" + " cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version")
         return 1
 
 
