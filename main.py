@@ -1,7 +1,6 @@
 import argparse
 import os
 import socket
-import time
 
 arg = argparse.ArgumentParser()
 arg.add_argument("-s", "--search", type=str, help="Search for a file")
@@ -55,9 +54,10 @@ def create(file):
         ip = socket.gethostbyname(socket.gethostname()+".")
         os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " mkdir /home/cmsc626/Desktop/files/" + file ).read()
         os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + file + "/" + ip).read()
-        os.popen("mkdir " + "files/" + file + " && " + "touch " + "files/" + file + "/" + file + " && " + "touch " + "files/" + file + "/" + ".version")
-        os.popen("echo \'1\n" + ip + "\' > " + "files/" + file + "/" + ".version")
-        os.popen("sshpass -p 12345 rsync files/" + file + "/" + ".version" + " cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + file + "/.version")
+        # Combine everything cause race conditions
+        os.popen("mkdir " + "files/" + file + " && " + "touch " + "files/" + file + "/" + file + " && " + "touch " + "files/" + file + "/" + ".version" + " && "
+                + "echo \'1\n" + ip + "\' > " + "files/" + file + "/" + ".version" + " && "
+                + "sshpass -p 12345 rsync files/" + file + "/" + ".version" + " cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + file + "/.version")
         return 1
 
 
@@ -85,9 +85,12 @@ def write(file, text):
         if int(version[0]) > int(remoteversion[0]):
             os.popen("sshpass -p 12345 rsync files/" + location[1] + "/" + ".version" + " cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version")
             users = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " ls /home/cmsc626/Desktop/files/" + location[1]).read().split('\n')
+            remoteversion = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " cat /home/cmsc626/Desktop/files/" + location[1] + "/" + ".version").read().split("\n")
             # Exclude the user from the purge who just pushed the file
             exclude = remoteversion[1]
             # Remove users from list of people with file who no longer have latest update
+            print("Exclude", exclude)
+            print("Users", users)
             for user in users:
                 if user != exclude and user != ".version" and user != location[1]:
                     os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " rm -f /home/cmsc626/Desktop/files/" + location[1] + "/" + user).read()
@@ -102,24 +105,26 @@ def write(file, text):
     print("File does not exist")
     return 0
 
+
 def download(file):
     location = search(file)
     if location:
-        if location[0] != socket.gethostbyname(socket.gethostname() + "."):
-            print(location[0])
-            print(file)
+        remoteversion = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " cat /home/cmsc626/Desktop/files/" + location[1] + "/" + ".version").read().split("\n")
+        version = open("files/" + location[1] + "/" + ".version").read().split()
+        ip = socket.gethostbyname(socket.gethostname() + ".")
+        if version[0] < remoteversion[0] and ip != remoteversion[1]:
             ip = socket.gethostbyname(socket.gethostname() + ".")
+            # Combine everything cause race conditions
             os.popen("sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + " files/" + " && "
                      + "sshpass -p 12345 rsync cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version" + " files/" + location[1] + "/.version" + " && "
                      + "sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/" + ip).read()
             return 1
-        return 0
+        else:
+            print("You already have the latest version")
+            return 0
     else:
-        print("File not found or you have the latest version")
+        print("File not found")
         return 0
-
-
-
 
 
 if __name__ == "__main__":
