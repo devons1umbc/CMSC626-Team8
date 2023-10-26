@@ -47,19 +47,17 @@ def read(query):
 
 
 def create(file):
-    location = search(file)
-    print(location)
-    if location:
+    if search(file):
         print(file + " already exists.")
         return 0
     else:
         ip = socket.gethostbyname(socket.gethostname()+".")
-        os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " mkdir /home/cmsc626/Desktop/files/" + location[1]).read()
-        os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/" + ip).read()
+        os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " mkdir /home/cmsc626/Desktop/files/" + file ).read()
+        os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + file + "/" + ip).read()
         # Combine everything cause race conditions
-        os.popen("mkdir " + "files/" + location[1] + " && " + "touch " + "files/" + location[1] + "/" + location[1] + " && " + "touch " + "files/" + location[1] + "/" + ".version" + " && "
-                + "echo \'1\n" + ip + "\' > " + "files/" + location[1] + "/" + ".version" + " && "
-                + "sshpass -p 12345 rsync files/" + location[1] + "/" + ".version" + " cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version")
+        os.popen("mkdir " + "files/" + file + " && " + "touch " + "files/" + file + "/" + file + " && " + "touch " + "files/" + file + "/" + ".version" + " && "
+                + "echo \'1\n" + ip + "\' > " + "files/" + file + "/" + ".version" + " && "
+                + "sshpass -p 12345 rsync files/" + file + "/" + ".version" + " cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + file + "/.version")
         return 1
 
 
@@ -111,19 +109,27 @@ def write(file, text):
 def download(file):
     location = search(file)
     if location:
-        remoteversion = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " cat /home/cmsc626/Desktop/files/" + location[1] + "/" + ".version").read().split("\n")
-        version = open("files/" + location[1] + "/" + ".version").read().split()
-        ip = socket.gethostbyname(socket.gethostname() + ".")
-        if version[0] < remoteversion[0] and ip != remoteversion[1]:
+        if os.path.exists("files/" + location[1] + "/" + ".version"):
+            remoteversion = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " cat /home/cmsc626/Desktop/files/" + location[1] + "/" + ".version").read().split("\n")
+            version = open("files/" + location[1] + "/" + ".version").read().split()
+            ip = socket.gethostbyname(socket.gethostname() + ".")
+            if version[0] < remoteversion[0] and ip != remoteversion[1]:
+                ip = socket.gethostbyname(socket.gethostname() + ".")
+                # Combine everything cause race conditions
+                os.popen("sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + " files/" + " && "
+                         + "sshpass -p 12345 rsync cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version" + " files/" + location[1] + "/.version" + " && "
+                         + "sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/" + ip).read()
+                return 1
+            else:
+                print("You already have the latest version")
+                return 0
+        else:
             ip = socket.gethostbyname(socket.gethostname() + ".")
             # Combine everything cause race conditions
             os.popen("sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + " files/" + " && "
                      + "sshpass -p 12345 rsync cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version" + " files/" + location[1] + "/.version" + " && "
                      + "sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/" + ip).read()
             return 1
-        else:
-            print("You already have the latest version")
-            return 0
     else:
         print("File not found")
         return 0
