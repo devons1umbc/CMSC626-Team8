@@ -15,6 +15,13 @@ args = arg.parse_args()
 directory_server = "192.168.1.6"
 
 
+def getip():
+    try:
+        return socket.gethostbyname(socket.gethostname()+".")
+    except:
+        return socket.gethostbyname(socket.gethostname() + ".local")
+
+
 def search(query):
     files = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " ls /home/cmsc626/Desktop/files").read().split('\n')
     for file in files:
@@ -51,7 +58,7 @@ def create(file):
         print(file + " already exists.")
         return 0
     else:
-        ip = socket.gethostbyname(socket.gethostname()+".")
+        ip = getip()
         os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " mkdir /home/cmsc626/Desktop/files/" + file ).read()
         os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + file + "/" + ip).read()
         # Combine everything cause race conditions
@@ -66,7 +73,7 @@ def write(file, text):
     if location:
         version = open("files/" + location[1] + "/" + ".version").read().split()
         print(version[0])
-        ip = socket.gethostbyname(socket.gethostname() + ".")
+        ip = getip()
 
         newfile = open("files/" + location[1] + "/" + location[1], "w")
         newfile.write(text)
@@ -112,9 +119,9 @@ def download(file):
         if os.path.exists("files/" + location[1] + "/" + ".version"):
             remoteversion = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " cat /home/cmsc626/Desktop/files/" + location[1] + "/" + ".version").read().split("\n")
             version = open("files/" + location[1] + "/" + ".version").read().split()
-            ip = socket.gethostbyname(socket.gethostname() + ".")
+            ip = getip()
             if version[0] < remoteversion[0] and ip != remoteversion[1]:
-                ip = socket.gethostbyname(socket.gethostname() + ".")
+                ip = getip()
                 # Combine everything cause race conditions
                 os.popen("sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + " files/" + " && "
                          + "sshpass -p 12345 rsync cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version" + " files/" + location[1] + "/.version" + " && "
@@ -124,7 +131,7 @@ def download(file):
                 print("You already have the latest version")
                 return 0
         else:
-            ip = socket.gethostbyname(socket.gethostname() + ".")
+            ip = getip()
             # Combine everything cause race conditions
             os.popen("sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + " files/" + " && "
                      + "sshpass -p 12345 rsync cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version" + " files/" + location[1] + "/.version" + " && "
@@ -136,6 +143,7 @@ def download(file):
 
 
 if __name__ == "__main__":
+    getip()
     if args.search:
         print(search(args.search))
     elif args.read:
