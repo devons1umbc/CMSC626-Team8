@@ -16,10 +16,15 @@ directory_server = "192.168.1.6"
 
 
 def getip():
-    try:
-        return socket.gethostbyname(socket.gethostname()+".")
-    except:
-        return socket.gethostbyname(socket.gethostname() + ".local")
+    ip = os.popen("ip a").read().split('\n')
+    for i in ip:
+        i = i.strip()
+        if "inet" in i:
+            if "127.0.0.1" in i or "::" in i:
+                continue
+            else:
+                return i.split(" ")[1].split("/")[0]
+    return 0
 
 
 def search(query):
@@ -132,10 +137,12 @@ def download(file):
                 return 0
         else:
             ip = getip()
+            print(location)
             # Combine everything cause race conditions
-            os.popen("sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + " files/" + " && "
-                     + "sshpass -p 12345 rsync cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version" + " files/" + location[1] + "/.version" + " && "
-                     + "sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/" + ip).read()
+            os.popen("sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + " files/")
+            # os.popen("sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + " files/" + " && "
+                     # + "sshpass -p 12345 rsync cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version" + " files/" + location[1] + "/.version" + " && "
+                     # + "sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/" + ip).read()
             return 1
     else:
         print("File not found")
