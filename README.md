@@ -1,10 +1,35 @@
 # CMSC626-Team8
 The official repository for CMSC 626 Team 8. 
 
-Members:
+Members: Devon Slonaker, Chris Abili, Yukta Medha, Jay Paun
 
-Devon Slonaker
+usage: main.py [-h] [-s SEARCH] [-d DOWNLOAD] [-r READ] [-c CREATE] [-w WRITE] [-m MESSAGE]
 
-Chris Abili
+optional arguments:
+  -h, --help            show this help message and exit
+  example: `python main.py --help`
+  
+  -s SEARCH, --search SEARCH
+                        Search for a file
+  example: `python main.py -s test.txt`
 
-Yukta
+  -d DOWNLOAD, --download DOWNLOAD
+                        Download a file
+  example: `python main.py -d test.txt`
+                        
+  -r READ, --read READ  
+                        Read a file
+  example: `python main.py -r test.txt`
+  
+  -c CREATE, --create CREATE
+                        Create a file
+  example: `python main.py -c test.txt`
+  
+  -w WRITE, --write WRITE
+                        Write to a file (must be used with -m)
+  example: `python main.py -w test.txt -m "This is text in a file`
+                        
+  -m MESSAGE, --message MESSAGE
+                        Message to write to a file (to be used with -w)
+  example: `python main.py -w test.txt -m "This is text in a file`
+
