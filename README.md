@@ -6,12 +6,12 @@ Members: Devon Slonaker, Chris Abili, Yukta Medha, Jay Paun
 usage: main.py [-h] [-s SEARCH] [-d DOWNLOAD] [-r READ] [-c CREATE] [-w WRITE] [-m MESSAGE]
 
 optional arguments:
-  -h, --help            show this help message and exit
-  example: `python main.py --help`
-  
-  -s SEARCH, --search SEARCH
-                        Search for a file
-  example: `python main.py -s test.txt`
+  -h, --help            show this help message and exit\n
+  example: `python main.py --help`\n
+  \n
+  -s SEARCH, --search SEARCH\n
+                        Search for a file\n
+  example: `python main.py -s test.txt`\n
 
   -d DOWNLOAD, --download DOWNLOAD
                         Download a file
