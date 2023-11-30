@@ -5,7 +5,7 @@ Members: Devon Slonaker, Chris Abili, Yukta Medha, Jay Paun
 
 To set up the environment to be able to test this file system, it is recommended to have at least 3 VMs running Linux. One of them will be a `directory` VM, and the other two will be `client` VMs.<br>
 Each VM should be logged in with a user of `cmsc626` and the password of the `cmsc626` user should be `12345`.<br>
-You will need to have the `argparse`, `os`, and `socket` libraries installed on your client VMs. to be able to run the file system.<br>
+You will need to have the `argparse`, `os`, and `socket` Python libraries installed on your client VMs. to be able to run the file system.<br>
 Put a `files` directory on the desktop of every VM.<br>
 File system away!<br>
 
