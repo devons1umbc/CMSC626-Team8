@@ -37,5 +37,12 @@ example: `python main.py -w test.txt -m "This is text in a file`<br>
 <br>
 -m MESSAGE, --message MESSAGE<br>
 Message to write to a file (to be used with -w)<br>
-example: `python main.py -w test.txt -m "This is text in a file`<br>
-
+example: `python main.py -w test.txt -m "This is text in a file"`<br>
+<br>
+-x DELETE, --delete DELETE<br>
+Delete a file from the file system<br>
+example: `python main.py -x test.txt`<br>
+<br>
+-z RECOVER, --recover RECOVER<br>
+Restore a file previously deleted from the file system<br>
+example: `python main.py -z test.txt`<br>
