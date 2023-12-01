@@ -9,6 +9,9 @@ arg.add_argument("-r", "--read", type=str, help="Read a file")
 arg.add_argument("-c", "--create", type=str, help="Create a file")
 arg.add_argument("-w", "--write", type=str, help="Write to a file (must be used with -m)")
 arg.add_argument("-m", "--message", type=str, help="Message to write to a file (to be used with -w)")
+arg.add_argument("-x", "--delete", type=str, help="Delete a file from the file system")
+arg.add_argument("-z", "--recover", type=str, help="Restore a file previously deleted from the file system")
+
 
 args = arg.parse_args()
 
@@ -61,6 +64,11 @@ def create(query):
     if search(query) and search(query) != 2:
         return 0
     else:
+        # If a file with the same name is already deleted, deny the creation in case the owner of the deleted file wants
+        # to recover the deleted file later
+        deleted = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " ls /home/cmsc626/Desktop/deleted").read().split('\n')
+        if query in deleted:
+            return 0
         ip = getip()
         # Combine everything cause race conditions
         # Establish new file's presence on directory server and make file locally
@@ -107,7 +115,7 @@ def write(query, text):
             remote_version = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " cat /home/cmsc626/Desktop/files/" + location[1] + "/" + ".version").read().split("\n")
             # Exclude the user from the purge who just pushed the file
             exclude = remote_version[1]
-            # Remove users from list of people with file who no longer have latest update
+            # Remove users from list of people with file who no longer have the latest update
             for user in users:
                 if user != exclude and user != ".version" and user != location[1]:
                     os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " rm -f /home/cmsc626/Desktop/files/" + location[1] + "/" + user).read()
@@ -131,8 +139,7 @@ def write_v2(query, text):
     # Works with a mutex file to deal with concurrent writes
     files = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " ls /home/cmsc626/Desktop/files/" + location[1]).read().split('\n')
     if ".mutex" in files:
-        print("Can't modify file at this time")
-        return 0
+        return 2
     else:
         os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/.mutex").read()
 
@@ -164,14 +171,11 @@ def write_v2(query, text):
             for user in users:
                 if user != exclude and user != ".version" and user != location[1]:
                     os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " rm -f /home/cmsc626/Desktop/files/" + location[1] + "/" + user).read()
-            print("Updated file " + query + "!")
             os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " rm -f /home/cmsc626/Desktop/files/" + location[1] + "/.mutex").read()
             return 1
         else:
-            print("File has been previously modified. Please pull the updated version.")
             os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " rm -f /home/cmsc626/Desktop/files/" + location[1] + "/.mutex").read()
-            return 0
-    print("File does not exist")
+            return 3
     os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " rm -f /home/cmsc626/Desktop/files/" + location[1] + "/.mutex").read()
     return 0
 
@@ -188,62 +192,126 @@ def download(query):
             if version[0] < remote_version[0] and ip != remote_version[1]:
                 ip = getip()
                 # Combine everything because of race conditions
-                # Copy file from most up to date person, copy version from directory, and insert ip to show ownership
+                # Copy file from most up-to-date person, copy version from directory, and insert ip to show ownership
                 os.popen("sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + " files/" + " && "
                          + "sshpass -p 12345 rsync cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version" + " files/" + location[1] + "/.version" + " && "
                          + "sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/" + ip).read()
-                print("File " + query + " has been successfully downloaded!")
                 return 1
-            # If user has latest version
+            # If user has the latest version
             else:
-                print("You already have the latest version")
-                return 0
+                return 2
         # If user does not have the file at all (pretty much do same as above but without version checking)
         else:
             ip = getip()
             # Combine everything because of race conditions
-            # Copy file from most up to date person, copy version from directory, and insert ip to show ownership
+            # Copy file from most up-to-date person, copy version from directory, and insert ip to show ownership
             os.popen("sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + " files/" + " && "
                      + "sshpass -p 12345 rsync cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version" + " files/" + location[1] + "/.version" + " && "
                      + "sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/" + ip).read()
-            print("File " + query + " has been successfully downloaded!")
             return 1
     else:
-        print("File not found")
         return 0
+
+
+def delete(query):
+    location = search(query)
+    if location and location != 2:
+        # This is pretty simple. Just move the directory containing the file and the version to a "delete" directory
+        # instead of formally deleting it, so it can be recovered later.
+        os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " mv /home/cmsc626/Desktop/files/" + location[1] + " /home/cmsc626/Desktop/deleted/" + location[1]).read()
+        return 1
+    return 0
+
+
+def recover(query):
+    # This is similar to the deletion check in the create file process
+    deleted = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " ls /home/cmsc626/Desktop/deleted").read().split('\n')
+    if query not in deleted:
+        return 0
+    else:
+        # Reverse of delete function
+        os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " mv /home/cmsc626/Desktop/deleted/" + query + " /home/cmsc626/Desktop/files/" + query).read()
+        return 1
 
 
 if __name__ == "__main__":
     getip()
     if args.search:
         file = search(args.search)
-        if file:
-            if file == 2:
-                print("Directory server not online")
-            else:
-                print("File " + str(args.search) + " has been found!")
+        # Successful search
+        if file and file != 2:
+            print("File " + str(args.search) + " has been found!")
+        # Directory is offline
+        elif file == 2:
+            print("Directory server not online")
+        # File not found
         else:
             print("File " + str(args.search) + " has not been found.")
 
     elif args.read:
         file = read(args.read)
+        # Successful read
         if file:
             print(str(args.read) + ": " + file)
+        # File not found
         else:
-            print("File " + str(args.read) + " not found")
+            print("File " + str(args.read) + " has not been found")
 
     elif args.create:
         file = create(args.create)
+        # Successful creation
         if file:
             print("File " + str(args.create) + " has been created!")
+        # File conflict
         else:
             print("File " + str(args.create) + " could not be created.")
 
     elif args.write:
-        write_v2(args.write, args.message)
+        file = write_v2(args.write, args.message)
+        # Successful write
+        if file and file != 2 and file != 3:
+            print("Updated file " + str(args.write) + "!")
+        # Mutex lock
+        elif file == 2:
+            print("Can't modify file " + str(args.write) + " at this time.")
+        # Obsolete file
+        elif file == 3:
+            print("File " + str(args.write) + " has been previously modified. Please pull the updated version.")
+        # File not found
+        else:
+            print("File " + str(args.write) + " has not been found.")
+
 
     elif args.download:
-        download(args.download)
+        file = download(args.download)
+        # Successful download
+        if file and file != 2:
+            print("File " + str(args.download) + " has been successfully downloaded!")
+        # Up-to-date file
+        elif file == 2:
+            print("You already have the latest version of file " + str(args.download) + ".")
+        # File not found
+        else:
+            print("File " + str(args.download) + " has not been found.")
 
+    elif args.delete:
+        file = delete(args.delete)
+        # Successful deletion
+        if file:
+            print("Successfully deleted file " + str(args.delete) + ".")
+        # File not found
+        else:
+            print("Unable to delete file " + str(args.delete) + ".")
+
+    elif args.recover:
+        file = recover(args.recover)
+        # Successful recovery
+        if file:
+            print("Successfully restored file " + str(args.recover) + ".")
+        # File not found
+        else:
+            print("File " + str(args.recover) + " has not been found.")
+
+    # Invalid user input
     else:
         print("Please enter a valid flag. Use --help to see all options.")
