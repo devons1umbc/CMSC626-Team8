@@ -1,6 +1,6 @@
 import argparse
 import os
-import socket
+from datetime import datetime
 
 arg = argparse.ArgumentParser()
 arg.add_argument("-s", "--search", type=str, help="Search for a file")
@@ -143,7 +143,8 @@ def write_v2(query, text):
     else:
         os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/.mutex").read()
 
-    if location and location != 2:
+    local = os.popen("ls /home/cmsc626/Desktop/files/").read().split('\n')
+    if location and location != 2 and location[1] in local:
         # Get initial versions
         version = open("files/" + location[1] + "/" + ".version").read().split()
         remote_version = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " cat /home/cmsc626/Desktop/files/" + location[1] + "/" + ".version").read().split("\n")
@@ -241,45 +242,75 @@ if __name__ == "__main__":
         # Successful search
         if file and file != 2:
             print("File " + str(args.search) + " has been found!")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " successfully searched file " + str(args.search) +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
         # Directory is offline
         elif file == 2:
             print("Directory server not online")
         # File not found
         else:
             print("File " + str(args.search) + " has not been found.")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully searched file " + str(args.search) + " (not found)" +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
 
     elif args.read:
         file = read(args.read)
         # Successful read
         if file:
             print(str(args.read) + ": " + file)
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " successfully read file " + str(args.read) +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
         # File not found
         else:
             print("File " + str(args.read) + " has not been found")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully read file " + str(args.read) + " (not found)" +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
 
     elif args.create:
         file = create(args.create)
         # Successful creation
         if file:
             print("File " + str(args.create) + " has been created!")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " successfully created file " + str(args.create) +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
         # File conflict
         else:
             print("File " + str(args.create) + " could not be created.")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully created file " + str(args.create) + " (already exists)" +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
 
     elif args.write:
         file = write_v2(args.write, args.message)
         # Successful write
         if file and file != 2 and file != 3:
             print("Updated file " + str(args.write) + "!")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " successfully wrote file " + str(args.write) +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
         # Mutex lock
         elif file == 2:
             print("Can't modify file " + str(args.write) + " at this time.")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully wrote file " + str(args.write) + " (mutex lock)" +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
         # Obsolete file
         elif file == 3:
             print("File " + str(args.write) + " has been previously modified. Please pull the updated version.")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully wrote file " + str(args.write) + " (previously modified)" +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
         # File not found
         else:
             print("File " + str(args.write) + " has not been found.")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully wrote file " + str(args.write) + " (not found)" +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
 
 
     elif args.download:
@@ -287,30 +318,51 @@ if __name__ == "__main__":
         # Successful download
         if file and file != 2:
             print("File " + str(args.download) + " has been successfully downloaded!")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " successfully downloaded file " + str(args.download) +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
         # Up-to-date file
         elif file == 2:
             print("You already have the latest version of file " + str(args.download) + ".")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully downloaded file " + str(args.download) + " (up-to-date)" +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
         # File not found
         else:
             print("File " + str(args.download) + " has not been found.")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully downloaded file " + str(args.download) + " (not found)" +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
 
     elif args.delete:
         file = delete(args.delete)
         # Successful deletion
         if file:
             print("Successfully deleted file " + str(args.delete) + ".")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " successfully deleted file " + str(args.delete) +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
         # File not found
         else:
             print("Unable to delete file " + str(args.delete) + ".")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully deleted file " + str(args.delete) + " (not found)" +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
 
     elif args.recover:
         file = recover(args.recover)
         # Successful recovery
         if file:
             print("Successfully restored file " + str(args.recover) + ".")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " successfully recovered file " + str(args.recover) +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
         # File not found
         else:
             print("File " + str(args.recover) + " has not been found.")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully recovered file " + str(args.recover) + " (not found)" +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
 
     # Invalid user input
     else:
