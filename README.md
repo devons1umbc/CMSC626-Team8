@@ -46,3 +46,9 @@ example: `python main.py -x test.txt`<br>
 -z RECOVER, --recover RECOVER<br>
 Restore a file previously deleted from the file system<br>
 example: `python main.py -z test.txt`<br>
+<br>
+-g GENERATE, --generate GENERATE<br>
+Generates a Public/Private key-pair<br>
+example: `python main.py -g True`<br>
+
+
