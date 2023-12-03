@@ -11,6 +11,7 @@ arg.add_argument("-w", "--write", type=str, help="Write to a file (must be used 
 arg.add_argument("-m", "--message", type=str, help="Message to write to a file (to be used with -w)")
 arg.add_argument("-x", "--delete", type=str, help="Delete a file from the file system")
 arg.add_argument("-z", "--recover", type=str, help="Restore a file previously deleted from the file system")
+arg.add_argument("-g", "--generate", type=bool, default=False, help="Generates a Public/Private key-pair")
 
 
 args = arg.parse_args()
@@ -46,6 +47,7 @@ def search(query):
     return 0
 
 
+# THIS IS NOW LEGACY CODE
 def read(query):
     location = search(query)
     if location and location != 2:
@@ -57,6 +59,15 @@ def read(query):
             return os.popen("sshpass -p 12345 ssh cmsc626@" + location[0] + " cat /home/cmsc626/Desktop/files/" + location[1] + "/" + location[1]).read()
     else:
         return 0
+
+
+# Reads a file only if it is on the client's system. This ensures confidentiality, eases the bandwidth, and gives the
+# client more control over the version they are reading from
+def read2(query):
+    files = os.popen("ls /home/cmsc626/Desktop/files/").read().split('\n')
+    if query in files:
+        return os.popen("cat files/"+query+"/"+query).read()
+    return 0
 
 
 def create(query):
@@ -136,6 +147,10 @@ def write(query, text):
 def write_v2(query, text):
     location = search(query)
 
+    # The quicker fixer upper for errors lolz
+    if location == 0:
+        return 0
+
     # Works with a mutex file to deal with concurrent writes
     files = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " ls /home/cmsc626/Desktop/files/" + location[1]).read().split('\n')
     if ".mutex" in files:
@@ -194,9 +209,24 @@ def download(query):
                 ip = getip()
                 # Combine everything because of race conditions
                 # Copy file from most up-to-date person, copy version from directory, and insert ip to show ownership
-                os.popen("sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + " files/" + " && "
-                         + "sshpass -p 12345 rsync cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version" + " files/" + location[1] + "/.version" + " && "
-                         + "sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/" + ip).read()
+                print(location)
+                # Copy over client's RSA pub key
+                print(os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " sshpass -p 12345 rsync /home/cmsc626/Desktop/keys/" + getip() + "-pub.pem " + " cmsc626@" + location[0] + ":/home/cmsc626/Desktop/keys/" + getip() + "-pub.pem && "
+                    # Encrypt the file
+                    + "sshpass -p 12345 ssh cmsc626@" + location[0] + " openssl rsautl -encrypt -inkey /home/cmsc626/Desktop/keys/" + getip() + "-pub.pem -pubin -in /home/cmsc626/Desktop/files/" + location[1] + "/" + location[1] + " -out /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc && "
+                    # Send over encrypted file to client
+                    + "sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc" + " /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc" + " && "
+                    # Remove encrypted file from host
+                    # + "sshpass -p 12345 ssh cmsc626@" + location[0] + " rm -f /home/cmsc626/Desktop/files/" +location[1] + "/" + getip() + "-" + location[1] + ".enc " + " && "
+                    # Copy version file
+                    + "sshpass -p 12345 rsync cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version" + " files/" + location[1] + "/.version" + " && "
+                    # Establish that client has file
+                    + "sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/" + ip + " && "
+                    # Decrypt file
+                    + "openssl rsautl -decrypt -inkey /home/cmsc626/Desktop/" + getip() + "-priv.pem -in /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc > /home/cmsc626/Desktop/files/" + location[1] + "/" + location[1]
+                    # Remove encrypted file from client
+                    # + "rm -f /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc"
+                    ).read())
                 return 1
             # If user has the latest version
             else:
@@ -206,9 +236,27 @@ def download(query):
             ip = getip()
             # Combine everything because of race conditions
             # Copy file from most up-to-date person, copy version from directory, and insert ip to show ownership
-            os.popen("sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + " files/" + " && "
-                     + "sshpass -p 12345 rsync cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version" + " files/" + location[1] + "/.version" + " && "
-                     + "sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/" + ip).read()
+            print(location)
+            # Copy over client's RSA pub key
+            print(os.popen(
+                "sshpass -p 12345 ssh cmsc626@" + directory_server + " sshpass -p 12345 rsync /home/cmsc626/Desktop/keys/" + getip() + "-pub.pem " + " cmsc626@" + location[0] + ":/home/cmsc626/Desktop/keys/" + getip() + "-pub.pem && "
+                # Encrypt the file
+                + "sshpass -p 12345 ssh cmsc626@" + location[0] + " openssl rsautl -encrypt -inkey /home/cmsc626/Desktop/keys/" + getip() + "-pub.pem -pubin -in /home/cmsc626/Desktop/files/" + location[1] + "/" + location[1] + " -out /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc && "
+                # Make a directory for the file
+                + "sshpass -p 12345 ssh cmsc626@" + getip() + " mkdir /home/cmsc626/Desktop/files/" + location[1] + " && "
+                # Send over encrypted file to client
+                + "sshpass -p 12345 rsync -r cmsc626@" + location[0] + ":/home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc" + " /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc" + " && "
+                # Remove encrypted file from host
+                # + "sshpass -p 12345 ssh cmsc626@" + location[0] + " rm -f /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc" + " && "
+                # Copy version file
+                + "sshpass -p 12345 rsync cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + location[1] + "/.version" + " files/" + location[1] + "/.version" + " && "
+                # Establish that client has file
+                + "sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + location[1] + "/" + ip + " && "
+                # Decrypt file
+                + "openssl rsautl -decrypt -inkey /home/cmsc626/Desktop/" + getip() + "-priv.pem -in /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc > /home/cmsc626/Desktop/files/" + location[1] + "/" + location[1]
+                # Remove encrypted file from client
+                # + "rm -f /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc"
+                ).read())
             return 1
     else:
         return 0
@@ -235,7 +283,22 @@ def recover(query):
         return 1
 
 
+def generate():
+    os.popen("openssl genrsa -out " + str(getip()) + "-priv.pem 4092 && openssl rsa -in " +
+             str(getip()) + "-priv.pem -pubout -out " + str(getip()) + "-pub.pem && " +
+             "sshpass -p 12345 rsync " + getip() + "-pub.pem cmsc626@" + directory_server + ":/home/cmsc626/Desktop/keys/" + getip() + "-pub.pem")
+
+
+def checkgen():
+    keys = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " ls /home/cmsc626/Desktop/keys").read().split('\n')
+    key = str(getip()) + "-pub.pem"
+    if key not in keys:
+        generate()
+
+
+
 if __name__ == "__main__":
+    checkgen()
     getip()
     if args.search:
         file = search(args.search)
@@ -256,7 +319,7 @@ if __name__ == "__main__":
                      "' >> /home/cmsc626/Desktop/log.txt\"")
 
     elif args.read:
-        file = read(args.read)
+        file = read2(args.read)
         # Successful read
         if file:
             print(str(args.read) + ": " + file)
@@ -311,7 +374,6 @@ if __name__ == "__main__":
             os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
                      getip() + " unsuccessfully wrote file " + str(args.write) + " (not found)" +
                      "' >> /home/cmsc626/Desktop/log.txt\"")
-
 
     elif args.download:
         file = download(args.download)
