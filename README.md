@@ -7,7 +7,7 @@ To set up the environment to be able to test this file system, it is recommended
 Each VM should be logged in with a user of `cmsc626` and the password of the `cmsc626` user should be `12345`.<br>
 You will need to have the `argparse`, `os`, and `socket` Python libraries installed on your client VMs. to be able to run the file system.<br>
 Put a `files` and `keys` directory on the desktop of every VM. Additionally, put a `logs.txt` file and a `deleted` directory on the desktop of the `directory` VM.<br>
-Note: Your VM may experience issues with host-key acceptance since we use sshpass, ssh, and rsync for the transportation of files through this entire project. To ensure a smoother experience testing this system, open /etc/ssh/ssh_config in a text editor, find `StrictHostKeyChecking`, uncomment, and change the value to `no`.
+Note: Your VM may experience issues with host-key acceptance since we use sshpass, ssh, and rsync for the transportation of files through this entire project. To ensure a smoother experience testing this system, open /etc/ssh/ssh_config in a text editor, find `StrictHostKeyChecking`, uncomment, and change the value to `no`.<br>
 File system away!<br>
 
 usage: main.py [-h] [-s SEARCH] [-d DOWNLOAD] [-r READ] [-c CREATE] [-w WRITE] [-m MESSAGE]
