@@ -12,12 +12,12 @@ arg.add_argument("-m", "--message", type=str, help="Message to write to a file (
 arg.add_argument("-x", "--delete", type=str, help="Delete a file from the file system")
 arg.add_argument("-z", "--recover", type=str, help="Restore a file previously deleted from the file system")
 arg.add_argument("-g", "--generate", type=bool, default=False, help="Generates a Public/Private key-pair")
+arg.add_argument("-p", "--permissions", type=str, default=False, help="Change permissions of a user")
 
 
 args = arg.parse_args()
 
 directory_server = "192.168.1.4"
-
 
 def getip():
     ip = os.popen("ip a").read().split('\n')
@@ -31,10 +31,52 @@ def getip():
     return 0
 
 
+def check_perms(user, query):
+    location = search(query)
+    if location and location != 2:
+        perms = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " cat /home/cmsc626/Desktop/files/" + location[1] + "/" + ".permissions").read().split('\n')
+        for i in perms:
+            if user in i:
+                results = i.split('\t')
+                if 'r' == results[1]:
+                    return 1
+                if 'rw' == results[1]:
+                    return 2
+    return 0
+
+
+def change_perms(user, perm, query):
+    location = search(query)
+    if location and location != 2:
+        local = os.popen("ls -a /home/cmsc626/Desktop/files/" + location[1]).read().split('\n')
+        if ".permissions" in local:
+            perms = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " cat /home/cmsc626/Desktop/files/" + location[1] + "/" + ".permissions").read().split('\n')
+            found = 0
+            for i in range(len(perms)):
+                if user in perms[i]:
+                    perms[i] = user + "\t" + perm
+                    found = 1
+                perms[i].strip('\n')
+            if found == 0:
+                perms.append(user + "\t" + perm)
+
+            aggregate = "\n".join(perms)
+            f = open("/home/cmsc626/Desktop/files/" + location[1] + "/" + ".permissions", "w")
+            f.write(aggregate)
+            f.close()
+            os.popen("sshpass -p 12345 rsync files/" + query + "/" + ".permissions" + " cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + query + "/.permissions")
+            return 1
+    return 0
+
+
 def search(query):
     ping = os.popen("ping -c 1 -w 1 " + str(directory_server)).read()
     if "100% packet loss" in ping:
         return 2
+
+    # if not check_perms(query, getip()):
+    #     return 0
+
     files = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " ls /home/cmsc626/Desktop/files").read().split('\n')
     for file in files:
         if file.lower() == str(query).lower():
@@ -83,11 +125,18 @@ def create(query):
         ip = getip()
         # Combine everything cause race conditions
         # Establish new file's presence on directory server and make file locally
-        os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " mkdir /home/cmsc626/Desktop/files/" + query +
-                 " && sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + query + "/" + ip +
-                 " && mkdir " + "files/" + query + " && " + "touch " + "files/" + query + "/" + query + " && " + "touch " + "files/" + query + "/" + ".version" +
-                 " && echo \'1\n" + ip + "\' > " + "files/" + query + "/" + ".version" +
-                 " && sshpass -p 12345 rsync files/" + query + "/" + ".version" + " cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + query + "/.version").read()
+        # Make directory for file on directory
+        os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " mkdir /home/cmsc626/Desktop/files/" + query
+            # Establish user presence on directory server
+            + " && sshpass -p 12345 ssh cmsc626@" + directory_server + " touch /home/cmsc626/Desktop/files/" + query + "/" + ip
+            # Make directory, file, version, and permissions file locally
+            + " && mkdir " + "files/" + query + " && " + "touch " + "files/" + query + "/" + query + " && " + "touch " + "files/" + query + "/" + ".version" + " && " + "touch " + "files/" + query + "/" + ".permissions"
+            # Create contents of the version file
+            + " && echo \'1\n" + ip + "\' > " + "files/" + query + "/" + ".version" + " && " "echo \'" + ip + "\trw\' > " + "files/" + query + "/" + ".permissions"
+            # Copy version file to directory server
+            + " && sshpass -p 12345 rsync files/" + query + "/" + ".version" + " cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + query + "/.version"
+            # Copy permissions file to directory server
+            + " && sshpass -p 12345 rsync files/" + query + "/" + ".permissions" + " cmsc626@" + directory_server + ":/home/cmsc626/Desktop/files/" + query + "/.permissions").read()
         return 1
 
 
@@ -95,6 +144,7 @@ def create(query):
 # Make changes locally, check version, push changes. Revert if wrong
 def write(query, text):
     location = search(query)
+
     if location and location != 2:
         # Get initial version
         version = open("files/" + location[1] + "/" + ".version").read().split()
@@ -151,6 +201,9 @@ def write_v2(query, text):
     if location == 0:
         return 0
 
+    if check_perms(getip(), location[1]) != 2:
+        return -1
+
     # Works with a mutex file to deal with concurrent writes
     files = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " ls /home/cmsc626/Desktop/files/" + location[1]).read().split('\n')
     if ".mutex" in files:
@@ -198,6 +251,13 @@ def write_v2(query, text):
 
 def download(query):
     location = search(query)
+
+    if location == 0:
+        return 0
+
+    if not check_perms(getip(), query):
+        return -1
+
     if location and location != 2:
         # Check if user currently owns file
         if os.path.exists("files/" + location[1] + "/" + ".version"):
@@ -209,9 +269,8 @@ def download(query):
                 ip = getip()
                 # Combine everything because of race conditions
                 # Copy file from most up-to-date person, copy version from directory, and insert ip to show ownership
-                print(location)
                 # Copy over client's RSA pub key
-                print(os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " sshpass -p 12345 rsync /home/cmsc626/Desktop/keys/" + getip() + "-pub.pem " + " cmsc626@" + location[0] + ":/home/cmsc626/Desktop/keys/" + getip() + "-pub.pem && "
+                os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " sshpass -p 12345 rsync /home/cmsc626/Desktop/keys/" + getip() + "-pub.pem " + " cmsc626@" + location[0] + ":/home/cmsc626/Desktop/keys/" + getip() + "-pub.pem && "
                     # Encrypt the file
                     + "sshpass -p 12345 ssh cmsc626@" + location[0] + " openssl rsautl -encrypt -inkey /home/cmsc626/Desktop/keys/" + getip() + "-pub.pem -pubin -in /home/cmsc626/Desktop/files/" + location[1] + "/" + location[1] + " -out /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc && "
                     # Send over encrypted file to client
@@ -226,7 +285,7 @@ def download(query):
                     + "openssl rsautl -decrypt -inkey /home/cmsc626/Desktop/" + getip() + "-priv.pem -in /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc > /home/cmsc626/Desktop/files/" + location[1] + "/" + location[1]
                     # Remove encrypted file from client
                     # + "rm -f /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc"
-                    ).read())
+                    ).read()
                 return 1
             # If user has the latest version
             else:
@@ -236,9 +295,8 @@ def download(query):
             ip = getip()
             # Combine everything because of race conditions
             # Copy file from most up-to-date person, copy version from directory, and insert ip to show ownership
-            print(location)
             # Copy over client's RSA pub key
-            print(os.popen(
+            os.popen(
                 "sshpass -p 12345 ssh cmsc626@" + directory_server + " sshpass -p 12345 rsync /home/cmsc626/Desktop/keys/" + getip() + "-pub.pem " + " cmsc626@" + location[0] + ":/home/cmsc626/Desktop/keys/" + getip() + "-pub.pem && "
                 # Encrypt the file
                 + "sshpass -p 12345 ssh cmsc626@" + location[0] + " openssl rsautl -encrypt -inkey /home/cmsc626/Desktop/keys/" + getip() + "-pub.pem -pubin -in /home/cmsc626/Desktop/files/" + location[1] + "/" + location[1] + " -out /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc && "
@@ -256,7 +314,7 @@ def download(query):
                 + "openssl rsautl -decrypt -inkey /home/cmsc626/Desktop/" + getip() + "-priv.pem -in /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc > /home/cmsc626/Desktop/files/" + location[1] + "/" + location[1]
                 # Remove encrypted file from client
                 # + "rm -f /home/cmsc626/Desktop/files/" + location[1] + "/" + getip() + "-" + location[1] + ".enc"
-                ).read())
+                ).read()
             return 1
     else:
         return 0
@@ -264,6 +322,13 @@ def download(query):
 
 def delete(query):
     location = search(query)
+
+    if location == 0:
+        return 0
+
+    if check_perms(getip(), location[1]) != 2:
+        return -1
+
     if location and location != 2:
         # This is pretty simple. Just move the directory containing the file and the version to a "delete" directory
         # instead of formally deleting it, so it can be recovered later.
@@ -278,6 +343,22 @@ def recover(query):
     if query not in deleted:
         return 0
     else:
+        if query in deleted:
+            perms = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " cat /home/cmsc626/Desktop/deleted/" + query + "/" + ".permissions").read().split('\n')
+            permresult = 0
+            for i in perms:
+                if getip() in i:
+                    results = i.split('\t')
+                    if 'r' == results[1]:
+                        permresult = 1
+                        break
+                    if 'rw' == results[1]:
+                        permresult = 2
+                        break
+
+            if permresult != 2:
+                return -1
+
         # Reverse of delete function
         os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " mv /home/cmsc626/Desktop/deleted/" + query + " /home/cmsc626/Desktop/files/" + query).read()
         return 1
@@ -290,10 +371,14 @@ def generate():
 
 
 def checkgen():
-    keys = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " ls /home/cmsc626/Desktop/keys").read().split('\n')
-    key = str(getip()) + "-pub.pem"
-    if key not in keys:
+    keys_dir = os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " ls /home/cmsc626/Desktop/keys").read().split('\n')
+    keys_local = os.popen("ls /home/cmsc626/Desktop").read()
+    key_pub = str(getip()) + "-pub.pem"
+    key_priv = str(getip()) + "-priv.pem"
+    if key_pub not in keys_dir or key_pub not in keys_local or key_priv not in keys_local:
         generate()
+        return 1
+    return 0
 
 
 
@@ -351,7 +436,7 @@ if __name__ == "__main__":
     elif args.write:
         file = write_v2(args.write, args.message)
         # Successful write
-        if file and file != 2 and file != 3:
+        if file and file != 2 and file != 3 and file != -1:
             print("Updated file " + str(args.write) + "!")
             os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
                      getip() + " successfully wrote file " + str(args.write) +
@@ -368,6 +453,12 @@ if __name__ == "__main__":
             os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
                      getip() + " unsuccessfully wrote file " + str(args.write) + " (previously modified)" +
                      "' >> /home/cmsc626/Desktop/log.txt\"")
+        # Insufficient permissions
+        elif file == -1:
+            print("File " + str(args.write) + " has not been found.")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully wrote file " + str(args.write) + " (insufficient permissions)" +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
         # File not found
         else:
             print("File " + str(args.write) + " has not been found.")
@@ -378,7 +469,7 @@ if __name__ == "__main__":
     elif args.download:
         file = download(args.download)
         # Successful download
-        if file and file != 2:
+        if file and file != 2 and file != -1:
             print("File " + str(args.download) + " has been successfully downloaded!")
             os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
                      getip() + " successfully downloaded file " + str(args.download) +
@@ -388,6 +479,12 @@ if __name__ == "__main__":
             print("You already have the latest version of file " + str(args.download) + ".")
             os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
                      getip() + " unsuccessfully downloaded file " + str(args.download) + " (up-to-date)" +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
+        # Insufficient permissions
+        elif file == -1:
+            print("File " + str(args.download) + " has not been found.")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully downloaded file " + str(args.download) + " (insufficient permissions)" +
                      "' >> /home/cmsc626/Desktop/log.txt\"")
         # File not found
         else:
@@ -399,10 +496,16 @@ if __name__ == "__main__":
     elif args.delete:
         file = delete(args.delete)
         # Successful deletion
-        if file:
+        if file and file != -1:
             print("Successfully deleted file " + str(args.delete) + ".")
             os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
                      getip() + " successfully deleted file " + str(args.delete) +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
+        # Insufficient permissions
+        elif file == -1:
+            print("Unable to delete file " + str(args.delete) + ".")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully deleted file " + str(args.delete) + " (insufficient permissions)" +
                      "' >> /home/cmsc626/Desktop/log.txt\"")
         # File not found
         else:
@@ -414,10 +517,16 @@ if __name__ == "__main__":
     elif args.recover:
         file = recover(args.recover)
         # Successful recovery
-        if file:
+        if file and file != -1:
             print("Successfully restored file " + str(args.recover) + ".")
             os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
                      getip() + " successfully recovered file " + str(args.recover) +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
+        # Insufficient permissions
+        elif file == -1:
+            print("File " + str(args.recover) + " has not been found.")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully recovered file " + str(args.recover) + " (insufficient permissions)" +
                      "' >> /home/cmsc626/Desktop/log.txt\"")
         # File not found
         else:
@@ -425,6 +534,38 @@ if __name__ == "__main__":
             os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
                      getip() + " unsuccessfully recovered file " + str(args.recover) + " (not found)" +
                      "' >> /home/cmsc626/Desktop/log.txt\"")
+
+    elif args.generate:
+        result = checkgen()
+        if result:
+            print("Key successfully updated!")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " successfully renewed key " +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
+        else:
+            print("Key does not need to be updated at this time.")
+            os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                     getip() + " unsuccessfully renewed key (key already exists)" +
+                     "' >> /home/cmsc626/Desktop/log.txt\"")
+
+    elif args.permissions:
+        perms = str(args.permissions).split()
+        if len(perms) > 3:
+            print("Too many arguments")
+        elif len(perms) < 3:
+            print("Not enough arguments")
+        else:
+            file = change_perms(perms[0], perms[1], perms[2])
+            if file:
+                print("Permissions for user " + perms[0] + " changed to " + perms[1] + " for file " + perms[2])
+                os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                    getip() + " successfully changed permissions for file " + perms[2] + " for user " + perms[0] + " to " + perms[1] +
+                    "' >> /home/cmsc626/Desktop/log.txt\"")
+            else:
+                print("File " + str(perms[2]) + " not found.")
+                os.popen("sshpass -p 12345 ssh cmsc626@" + directory_server + " \"echo '" + str(datetime.now()) + " --> " +
+                    getip() + " unsuccessfully changed permissions for file " + perms[2] + " for user " + perms[0] + " to " + perms[1] + " (not file owner)" +
+                    "' >> /home/cmsc626/Desktop/log.txt\"")
 
     # Invalid user input
     else:
