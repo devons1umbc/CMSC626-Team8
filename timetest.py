@@ -15,5 +15,5 @@ for i in range(tests):
     os.system("python main.py -w permtest.txt -m 'commit " + str(i) + "'")
 end_time_write = time.time() - start_time_write
 
-print("Read: " + str(start_time_read))
-print("Write: " + str(start_time_write))
+print("Read: " + str(end_time_read))
+print("Write: " + str(end_time_write))
