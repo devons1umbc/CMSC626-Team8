@@ -6,7 +6,7 @@ Members: Devon Slonaker, Chris Abili, Yukta Medha, Jay Paun
 To set up the environment to be able to test this file system, it is recommended to have at least 3 VMs running Linux. One of them will be a `directory` VM, and the other two will be `client` VMs.<br>
 Each VM should be logged in with a user of `cmsc626` and the password of the `cmsc626` user should be `12345`.<br>
 You will need to have the `argparse`, `os`, and `socket` Python libraries installed on your client VMs. to be able to run the file system.<br>
-Put a `files` directory on the desktop of every VM.<br>
+Put a `files` and `keys` directory on the desktop of every VM. Additionally, put a `logs.txt` file and a `deleted` directory on the desktop of the `directory` VM.<br>
 File system away!<br>
 
 usage: main.py [-h] [-s SEARCH] [-d DOWNLOAD] [-r READ] [-c CREATE] [-w WRITE] [-m MESSAGE]
@@ -50,5 +50,8 @@ example: `python main.py -z test.txt`<br>
 -g GENERATE, --generate GENERATE<br>
 Generates a Public/Private key-pair<br>
 example: `python main.py -g True`<br>
-
-
+<br>
+-p PERMISSIONS, --permissions PERMISSIONS<br>
+Change permissions of a user<br>
+example: `python main.py -p "192.168.1.5 r permtest.txt"`<br>
+Note: Valid permissions include `r` for "read", `rw` for "read and write", and `.` for "no permissions"<br>
