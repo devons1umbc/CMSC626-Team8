@@ -365,7 +365,7 @@ def recover(query):
 
 
 def generate():
-    os.popen("openssl genrsa -out " + str(getip()) + "-priv.pem 4092 && openssl rsa -in " +
+    os.popen("openssl genrsa -out " + str(getip()) + "-priv.pem 4096 && openssl rsa -in " +
              str(getip()) + "-priv.pem -pubout -out " + str(getip()) + "-pub.pem && " +
              "sshpass -p 12345 rsync " + getip() + "-pub.pem cmsc626@" + directory_server + ":/home/cmsc626/Desktop/keys/" + getip() + "-pub.pem")
 
